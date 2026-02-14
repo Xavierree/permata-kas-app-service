@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WA Generator - Iuran Kas</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#4F46E5', // Indigo 600
+                        secondary: '#10B981', // Emerald 500
+                        danger: '#EF4444', // Red 500
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+    </style>
+</head>
+
+<body class="bg-gray-50 text-gray-800 min-h-screen">
+    <div class="max-w-3xl mx-auto p-4 md:p-8">
+        <!-- Header -->
+        <header class="mb-8 text-center">
+            <h1 class="text-3xl font-bold text-gray-900 mb-2">🏷️ WA Generator</h1>
+            <p class="text-gray-500">Generator Template Chat Iuran Kas Gereja</p>
+        </header>
+
+        <!-- Main Content -->
+        <div class="bg-white rounded-xl shadow-lg p-6 md:p-8">
+
+            <!-- Controls -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                <!-- Sheet Selection -->
+                <div class="md:col-span-2">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Pilih Tahun Data (Google Sheet)</label>
+                    <select id="sheetSelect"
+                        class="w-full px-4 py-2 border border-blue-200 bg-blue-50 text-blue-800 font-semibold rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition">
+                        <option value="">Loading Sheets...</option>
+                    </select>
+                </div>
+
+                <!-- Sender Name -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Nama Pengirim</label>
+                    <input type="text" id="senderName"
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition"
+                        placeholder="Contoh: Eideltha Xavierre">
+                </div>
+
+                <!-- Greeting -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Sapaan</label>
+                    <select id="greetingSelect"
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition">
+                        <option value="Kakak">Kakak</option>
+                        <option value="Abang">Abang</option>
+                        <option value="custom">-- Ketik Sapaan Sendiri --</option>
+                    </select>
+                    <input type="text" id="greetingInput"
+                        class="w-full px-4 py-2 mt-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition hidden"
+                        placeholder="Contoh: Bang Kevin, Kak Eunice...">
+                </div>
+
+                <!-- Select Member (Searchable) -->
+                <div class="md:col-span-2">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Pilih Anggota</label>
+                    <div class="flex gap-2">
+                        <div class="relative w-full">
+                            <input type="text" id="memberSearch"
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition disabled:bg-gray-100 disabled:cursor-not-allowed"
+                                placeholder="Ketik untuk mencari..." autocomplete="off">
+
+                            <div id="memberDropdown"
+                                class="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-xl max-h-60 overflow-y-auto hidden">
+                                <!-- Dynamic Options -->
+                            </div>
+                        </div>
+                        <button id="refreshBtn"
+                            class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg transition"
+                            title="Refresh Data">
+                            <i class="fas fa-sync-alt"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Filters & Sort -->
+            <div class="flex flex-wrap gap-4 mb-6 pb-6 border-b border-gray-100">
+                <label class="flex items-center space-x-2 text-sm text-gray-600 cursor-pointer">
+                    <input type="checkbox" id="filterUnpaid"
+                        class="form-checkbox text-primary rounded ring-offset-2 ring-primary">
+                    <span>Hanya yang Belum Lunas</span>
+                </label>
+                <div class="flex-grow"></div>
+                <button id="sortBtn"
+                    class="text-sm text-primary hover:text-indigo-700 font-medium flex items-center gap-1">
+                    <i class="fas fa-sort-amount-down"></i> Urutkan Tunggakan Terbesar
+                </button>
+            </div>
+
+            <!-- Action Button -->
+            <button id="generateBtn"
+                class="w-full py-3 bg-primary hover:bg-indigo-700 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition transform hover:-translate-y-0.5 mb-8">
+                Generate Template
+            </button>
+
+            <!-- Result Area -->
+            <div id="resultArea" class="hidden">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-semibold text-gray-900">Preview Pesan</h3>
+                    <span id="statusBadge"
+                        class="hidden px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
+                        STATUS
+                    </span>
+                </div>
+
+                <div class="relative">
+                    <textarea id="messagePreview"
+                        class="w-full h-64 p-4 border border-gray-200 rounded-lg bg-gray-50 font-mono text-sm leading-relaxed resize-none focus:outline-none focus:ring-2 focus:ring-primary focus:bg-white transition"></textarea>
+                    <button id="copyBtn"
+                        class="absolute top-2 right-2 p-2 bg-white border border-gray-200 rounded hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition"
+                        title="Copy Text">
+                        <i class="far fa-copy"></i>
+                    </button>
+                </div>
+
+                <!-- WhatsApp Button -->
+                <a id="waLink" href="#" target="_blank"
+                    class="mt-4 flex items-center justify-center w-full py-3 bg-secondary hover:bg-emerald-600 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition transform hover:-translate-y-0.5 gap-2">
+                    <i class="fab fa-whatsapp text-xl"></i>
+                    Buka WhatsApp
+                </a>
+            </div>
+
+            <!-- Empty State / Loading -->
+            <div id="loadingState" class="hidden text-center py-12">
+                <i class="fas fa-circle-notch fa-spin text-4xl text-gray-300 mb-3"></i>
+                <p class="text-gray-500">Memproses data...</p>
+            </div>
+
+        </div>
+
+        <!-- Footer -->
+        <footer class="mt-12 text-center text-sm text-gray-400">
+            <p>&copy; 2026 WA Generator. Built for speed & simplicity.</p>
+        </footer>
+    </div>
+
+    <script src="/js/app.js?v=12"></script>
+</body>
+
+</html>
