@@ -2,11 +2,15 @@ const express = require('express');
 const router = express.Router();
 const sheetsService = require('../services/sheets');
 const templateUtils = require('../utils/templates');
+const template2Utils = require('../utils/template-2');
+const templateInviteUtils = require('../utils/template-invite');
+const templatePromotionUtils = require('../utils/template-promotion');
 
 // GET /api/sheets
 router.get('/sheets', async (req, res) => {
     try {
-        const sheets = await sheetsService.getSheets();
+        const mode = req.query.mode || 'permata';
+        const sheets = await sheetsService.getSheets(mode);
         res.json(sheets);
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -17,7 +21,8 @@ router.get('/sheets', async (req, res) => {
 router.get('/members', async (req, res) => {
     try {
         const sheetName = req.query.sheet; // Optional query param
-        const members = await sheetsService.getMembers(sheetName);
+        const mode = req.query.mode || 'permata';
+        const members = await sheetsService.getMembers(sheetName, mode);
         res.json(members);
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -26,7 +31,7 @@ router.get('/members', async (req, res) => {
 
 // POST /api/generate
 router.post('/generate', (req, res) => {
-    const { member, senderName, greeting } = req.body;
+    const { member, senderName, greeting, groupLink, useIntroduction = true, mode = 'permata', noSenderName, noReceiverName } = req.body;
 
     if (!member || !senderName || !greeting) {
         return res.status(400).json({ error: "Missing required fields" });
@@ -38,21 +43,39 @@ router.post('/generate', (req, res) => {
     }
 
     try {
-        const message = templateUtils.generateTemplate(member, senderName, greeting);
+        let message;
+        if (mode === 'inviting') {
+            message = templateInviteUtils.generateTemplate(member, senderName, greeting, groupLink);
+        } else if (mode === 'promotion') {
+            message = templatePromotionUtils.generateTemplate(member, senderName, greeting, noSenderName, noReceiverName);
+        } else if (useIntroduction === false || useIntroduction === 'false') {
+            message = template2Utils.generateTemplate(member, senderName, greeting);
+        } else {
+            message = templateUtils.generateTemplate(member, senderName, greeting);
+        }
 
         let responseData = {
             message: message,
             phone: member.phone,
-            status: member.status
+            status: mode === 'promotion' ? 'PROMOTION' : member.status
         };
 
-        if (member.status === 'PAID') {
+        if (mode === 'promotion') {
+            if (!message) {
+                 responseData.message = null;
+                 responseData.info = "Gagal membuat template promosi.";
+            }
+        } else if (member.status === 'PAID') {
             responseData.message = null; // Explicitly null
             responseData.info = "Anggota sudah LUNAS. Tidak ada tagihan.";
         } else if (!message) {
-            // Fallback if message is null but status isn't PAID? Should not happen with current logic but handle it.
+            // Fallback if message is null
             responseData.message = null;
-            responseData.info = "Tidak ada tagihan yang perlu dibayar.";
+            if (mode === 'inviting') {
+                responseData.info = "Gagal membuat template undangan.";
+            } else {
+                responseData.info = "Tidak ada tagihan yang perlu dibayar.";
+            }
         }
 
         res.json(responseData);

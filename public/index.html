@@ -42,6 +42,25 @@
 
             <!-- Controls -->
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                <!-- Mode Selection -->
+                <div class="md:col-span-2 bg-gray-50 p-4 rounded-lg border border-gray-100 flex flex-col md:flex-row gap-4 justify-between items-center">
+                    <span class="text-sm font-semibold text-gray-700">Mode Aplikasi</span>
+                    <div class="flex gap-4 flex-wrap">
+                        <label class="inline-flex items-center cursor-pointer">
+                            <input type="radio" name="appMode" value="permata" class="form-radio text-primary focus:ring-primary w-5 h-5" checked>
+                            <span class="ml-2 text-gray-700 font-medium">Penagihan Iuran</span>
+                        </label>
+                        <label class="inline-flex items-center cursor-pointer">
+                            <input type="radio" name="appMode" value="inviting" class="form-radio text-primary focus:ring-primary w-5 h-5">
+                            <span class="ml-2 text-gray-700 font-medium">Undangan Grup</span>
+                        </label>
+                        <label class="inline-flex items-center cursor-pointer">
+                            <input type="radio" name="appMode" value="promotion" class="form-radio text-primary focus:ring-primary w-5 h-5">
+                            <span class="ml-2 text-gray-700 font-medium">Promosi Danus</span>
+                        </label>
+                    </div>
+                </div>
+
                 <!-- Sheet Selection -->
                 <div class="md:col-span-2">
                     <label class="block text-sm font-medium text-gray-700 mb-2">Pilih Tahun Data (Google Sheet)</label>
@@ -66,11 +85,20 @@
                         class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition">
                         <option value="Kakak">Kakak</option>
                         <option value="Abang">Abang</option>
+                        <option value="none">-- Tanpa Sapaan --</option>
                         <option value="custom">-- Ketik Sapaan Sendiri --</option>
                     </select>
                     <input type="text" id="greetingInput"
                         class="w-full px-4 py-2 mt-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition hidden"
                         placeholder="Contoh: Bang Kevin, Kak Eunice...">
+                </div>
+
+                <!-- Group Link (Inviting Mode Only) -->
+                <div id="groupLinkWrapper" class="hidden md:col-span-2">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Link Grup WhatsApp</label>
+                    <input type="text" id="groupLinkInput"
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition"
+                        placeholder="Contoh: https://chat.whatsapp.com/...">
                 </div>
 
                 <!-- Select Member (Searchable) -->
@@ -97,7 +125,7 @@
             </div>
 
             <!-- Filters & Sort -->
-            <div class="flex flex-wrap gap-4 mb-6 pb-6 border-b border-gray-100">
+            <div id="filterSection" class="flex flex-wrap gap-4 mb-6 pb-6 border-b border-gray-100">
                 <label class="flex items-center space-x-2 text-sm text-gray-600 cursor-pointer">
                     <input type="checkbox" id="filterUnpaid"
                         class="form-checkbox text-primary rounded ring-offset-2 ring-primary">
@@ -108,6 +136,37 @@
                     class="text-sm text-primary hover:text-indigo-700 font-medium flex items-center gap-1">
                     <i class="fas fa-sort-amount-down"></i> Urutkan Tunggakan Terbesar
                 </button>
+            </div>
+
+            <!-- Perkenalan Switch -->
+            <div id="useIntroductionToggleWrapper" class="flex items-center justify-between mb-6 p-4 bg-gray-50 rounded-lg border border-gray-100">
+                <div class="flex flex-col">
+                    <span class="text-sm font-semibold text-gray-700">Perkenalan</span>
+                    <span class="text-xs text-gray-500">Sertakan perkenalan pengirim di awal pesan</span>
+                </div>
+                <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" id="useIntroduction" class="sr-only peer" checked>
+                    <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                </label>
+            </div>
+
+            <!-- Opsi Nama (Promotion) -->
+            <div id="nameOptionsWrapper" class="hidden flex flex-col gap-3 mb-6 p-4 bg-gray-50 rounded-lg border border-gray-100">
+                <span class="text-sm font-semibold text-gray-700 mb-1">Opsi Template Promosi</span>
+                <label class="flex items-center space-x-2 text-sm text-gray-700 cursor-pointer">
+                    <input type="checkbox" id="noSenderName" class="form-checkbox text-primary rounded w-4 h-4 ring-offset-2 ring-primary">
+                    <span>Tanpa Nama Pengirim</span>
+                </label>
+                <label class="flex items-center space-x-2 text-sm text-gray-700 cursor-pointer">
+                    <input type="checkbox" id="noReceiverName" class="form-checkbox text-primary rounded w-4 h-4 ring-offset-2 ring-primary">
+                    <span>Tanpa Nama Penerima</span>
+                </label>
+                
+                <hr class="border-gray-200 my-2">
+                
+                <span class="text-sm font-semibold text-gray-700 mb-1">Lampiran Gambar</span>
+                <span class="text-xs text-gray-500 mb-2">Gambar akan otomatis di-copy ke clipboard saat membuka WhatsApp. Kamu tinggal klik Paste (Cmd+V / Ctrl+V).</span>
+                <input type="file" id="imageAttachment" accept="image/*" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-white hover:file:bg-indigo-700 transition cursor-pointer">
             </div>
 
             <!-- Action Button -->

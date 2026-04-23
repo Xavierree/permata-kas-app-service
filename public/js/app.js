@@ -2,8 +2,10 @@
 let members = [];
 let currentMember = null;
 let isSorted = false;
+let currentMode = 'permata';
 
 // DOM Elements
+const modeRadios = document.querySelectorAll('input[name="appMode"]');
 const sheetSelect = document.getElementById('sheetSelect');
 const senderName = document.getElementById('senderName');
 const greetingSelect = document.getElementById('greetingSelect');
@@ -19,13 +21,46 @@ const generateBtn = document.getElementById('generateBtn');
 const resultArea = document.getElementById('resultArea');
 const messagePreview = document.getElementById('messagePreview');
 const waLink = document.getElementById('waLink');
-const statusBadge = document.getElementById('statusBadge');
-const copyBtn = document.getElementById('copyBtn');
-const loadingState = document.getElementById('loadingState');
+const useIntroductionToggle = document.getElementById('useIntroduction');
+const noSenderNameCheckbox = document.getElementById('noSenderName');
+const noReceiverNameCheckbox = document.getElementById('noReceiverName');
+const nameOptionsWrapper = document.getElementById('nameOptionsWrapper');
+const imageAttachmentInput = document.getElementById('imageAttachment');
+
+let preprocessedImageBlob = null;
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
     fetchSheets();
+
+    // Mode Radio Listeners
+    modeRadios.forEach(radio => {
+        radio.addEventListener('change', (e) => {
+            currentMode = e.target.value;
+            fetchSheets();
+
+            const filterSection = document.getElementById('filterSection');
+            const useIntroductionToggleWrapper = document.getElementById('useIntroductionToggleWrapper');
+            const groupLinkWrapper = document.getElementById('groupLinkWrapper');
+            
+            if (currentMode === 'inviting') {
+                filterSection.classList.add('hidden');
+                useIntroductionToggleWrapper.classList.add('hidden');
+                groupLinkWrapper.classList.remove('hidden');
+                nameOptionsWrapper.classList.add('hidden');
+            } else if (currentMode === 'promotion') {
+                filterSection.classList.add('hidden');
+                useIntroductionToggleWrapper.classList.add('hidden');
+                groupLinkWrapper.classList.add('hidden');
+                nameOptionsWrapper.classList.remove('hidden');
+            } else {
+                filterSection.classList.remove('hidden');
+                useIntroductionToggleWrapper.classList.remove('hidden');
+                groupLinkWrapper.classList.add('hidden');
+                nameOptionsWrapper.classList.add('hidden');
+            }
+        });
+    });
 
     // Close dropdown when clicking outside
     document.addEventListener('click', (e) => {
@@ -77,20 +112,53 @@ messagePreview.addEventListener('input', () => {
     if (currentMember && currentMember.phone && waLink) {
         const updatedMessage = messagePreview.value;
         const encodedMsg = encodeURIComponent(updatedMessage);
-        // Normalize phone if needed (already done in backend, but let's be safe)
-        // actually `currentMember.phone` might be raw from sheet, backend sends `data.phone`.
-        // We verified backend sends `data.phone` which is formatted.
-        // But `currentMember` is from the `members` array.
-        // Let's store the generated phone in a dataset or global var to be safe.
-        // Better: extract phone from current WA link? Or just use `members` data if it's there.
-        // The backend does normalization. `members` has raw phone.
-        // Let's rely on the fact that `data.phone` was used to set the link.
+        waLink.href = `https://wa.me/${currentMember.phone}?text=${encodedMsg}`;
+    }
+});
 
-        // Simpler approach: update the href's text param only.
-        const currentHref = waLink.href;
-        if (currentHref && currentHref.includes("wa.me")) {
-            const baseUrl = currentHref.split("?")[0];
-            waLink.href = `${baseUrl}?text=${encodedMsg}`;
+// Image Upload processing
+if (imageAttachmentInput) {
+    imageAttachmentInput.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            try {
+                const originalText = imageAttachmentInput.nextElementSibling ? imageAttachmentInput.nextElementSibling.textContent : '';
+                preprocessedImageBlob = await convertToPngBlob(file);
+                // Slight UX feedback
+                console.log("Image processed and ready for clipboard.");
+            } catch (err) {
+                console.error("Error converting image:", err);
+                preprocessedImageBlob = null;
+                alert("Gambar tidak dapat diproses. Coba gambar lain.");
+            }
+        } else {
+            preprocessedImageBlob = null;
+        }
+    });
+}
+
+// WA Link Click Interceptor
+waLink.addEventListener('click', async (e) => {
+    // Only intercept if we have an image to push
+    if (preprocessedImageBlob && waLink.href && waLink.href !== '#' && !waLink.href.includes('javascript:')) {
+        e.preventDefault();
+        const href = waLink.href;
+        const originalHtml = waLink.innerHTML;
+        
+        waLink.innerHTML = `<i class="fas fa-spinner fa-spin text-xl"></i> Menyiapkan Gambar...`;
+        
+        try {
+            await navigator.clipboard.write([
+                new ClipboardItem({ 'image/png': preprocessedImageBlob })
+            ]);
+            console.log("Image copied to clipboard successfully!");
+            window.open(href, '_blank');
+        } catch (err) {
+            console.error("Clipboard copy failed:", err);
+            alert("Gagal menyalin gambar secara otomatis ke clipboard. Pastikan browser memberikan izin clipboard. WhatsApp akan tetap dibuka.");
+            window.open(href, '_blank');
+        } finally {
+            waLink.innerHTML = originalHtml;
         }
     }
 });
@@ -137,7 +205,7 @@ function removeActive(x) {
 // Fetch Sheets
 async function fetchSheets() {
     try {
-        const response = await fetch('/api/sheets');
+        const response = await fetch(`/api/sheets?mode=${currentMode}`);
         const sheets = await response.json();
 
         sheetSelect.innerHTML = '';
@@ -188,7 +256,8 @@ async function fetchMembers() {
     memberSearch.value = 'Mengambil data...'; // More natural "Fetching..."
 
     const selectedSheet = sheetSelect.value;
-    const url = selectedSheet ? `/api/members?sheet=${encodeURIComponent(selectedSheet)}` : '/api/members';
+    const sheetParam = selectedSheet ? `sheet=${encodeURIComponent(selectedSheet)}&` : '';
+    const url = `/api/members?${sheetParam}mode=${currentMode}`;
 
     try {
         const response = await fetchWithTimeout(url, { timeout: 15000 }); // 15s Timeout
@@ -252,13 +321,21 @@ function renderDropdownList(listToRender) {
         let nameDisplay = member.name;
         // Simple manual bolding for search match could be added here if desired
 
+        let statusHtml = '';
+        if (currentMode === 'promotion') {
+            statusHtml = '<span class="text-xs font-bold text-purple-600 bg-purple-100 px-2 py-1 rounded-full">Target Promosi</span>';
+        } else if (member.status === 'PAID') {
+            statusHtml = '<span class="text-xs font-bold text-green-600 bg-green-100 px-2 py-1 rounded-full">LUNAS</span>';
+        } else if (member.status === 'INVITE') {
+            statusHtml = '<span class="text-xs font-bold text-blue-600 bg-blue-100 px-2 py-1 rounded-full">Panitia</span>';
+        } else {
+            statusHtml = `<span class="text-xs font-bold text-red-600 bg-red-100 px-2 py-1 rounded-full">${member.total}</span>`;
+        }
+
         div.innerHTML = `
             <div class="flex justify-between items-center">
                 <span class="font-medium text-gray-800">${member.name}</span>
-                ${member.status === 'PAID'
-                ? '<span class="text-xs font-bold text-green-600 bg-green-100 px-2 py-1 rounded-full">LUNAS</span>'
-                : `<span class="text-xs font-bold text-red-600 bg-red-100 px-2 py-1 rounded-full">${member.total}</span>`
-            }
+                ${statusHtml}
             </div>
         `;
 
@@ -311,6 +388,10 @@ async function generateTemplate() {
         }
     }
 
+    // Group Link (Inviting Mode Option)
+    const groupLinkInput = document.getElementById('groupLinkInput');
+    const groupLink = groupLinkInput ? groupLinkInput.value.trim() : '';
+
     // Generate Button Loading State
     const originalBtnText = generateBtn.textContent;
     generateBtn.disabled = true;
@@ -328,7 +409,12 @@ async function generateTemplate() {
             body: JSON.stringify({
                 member: currentMember,
                 senderName: sender, // Fix: Backend expects senderName
-                greeting
+                greeting,
+                groupLink,
+                useIntroduction: useIntroductionToggle.checked,
+                noSenderName: noSenderNameCheckbox.checked,
+                noReceiverName: noReceiverNameCheckbox.checked,
+                mode: currentMode
             }),
             timeout: 10000 // 10s Timeout
         });
@@ -343,10 +429,16 @@ async function generateTemplate() {
         resultArea.classList.remove('hidden');
 
         // Status Badge
-        statusBadge.classList.remove('hidden', 'bg-green-100', 'text-green-800', 'bg-red-100', 'text-red-800');
+        statusBadge.classList.remove('hidden', 'bg-green-100', 'text-green-800', 'bg-red-100', 'text-red-800', 'bg-blue-100', 'text-blue-800', 'bg-purple-100', 'text-purple-800');
         if (data.status === 'PAID') {
             statusBadge.textContent = 'LUNAS';
             statusBadge.classList.add('bg-green-100', 'text-green-800');
+        } else if (data.status === 'INVITE') {
+            statusBadge.textContent = 'UNDANGAN';
+            statusBadge.classList.add('bg-blue-100', 'text-blue-800');
+        } else if (data.status === 'PROMOTION') {
+            statusBadge.textContent = 'PROMOSI';
+            statusBadge.classList.add('bg-purple-100', 'text-purple-800');
         } else {
             statusBadge.textContent = 'BELUM LUNAS';
             statusBadge.classList.add('bg-red-100', 'text-red-800');
@@ -393,10 +485,16 @@ function displayResult(data) {
     resultArea.classList.remove('hidden');
 
     // Status Badge
-    statusBadge.classList.remove('hidden', 'bg-green-100', 'text-green-800', 'bg-red-100', 'text-red-800');
+    statusBadge.classList.remove('hidden', 'bg-green-100', 'text-green-800', 'bg-red-100', 'text-red-800', 'bg-blue-100', 'text-blue-800', 'bg-purple-100', 'text-purple-800');
     if (data.status === 'PAID') {
         statusBadge.textContent = 'LUNAS';
         statusBadge.classList.add('bg-green-100', 'text-green-800');
+    } else if (data.status === 'INVITE') {
+        statusBadge.textContent = 'UNDANGAN';
+        statusBadge.classList.add('bg-blue-100', 'text-blue-800');
+    } else if (data.status === 'PROMOTION') {
+        statusBadge.textContent = 'PROMOSI';
+        statusBadge.classList.add('bg-purple-100', 'text-purple-800');
     } else {
         statusBadge.textContent = 'BELUM LUNAS';
         statusBadge.classList.add('bg-red-100', 'text-red-800');
@@ -439,4 +537,36 @@ function setLoading(isLoading) {
     } else {
         loadingState.classList.add('hidden');
     }
+}
+
+// Utility: Process File to PNG Blob
+function convertToPngBlob(file) {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        const url = URL.createObjectURL(file);
+        
+        img.onload = () => {
+            URL.revokeObjectURL(url);
+            const canvas = document.createElement('canvas');
+            canvas.width = img.naturalWidth;
+            canvas.height = img.naturalHeight;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0);
+            
+            canvas.toBlob((blob) => {
+                if (blob) {
+                    resolve(blob);
+                } else {
+                    reject(new Error('Canvas toBlob conversion failed'));
+                }
+            }, 'image/png');
+        };
+        
+        img.onerror = () => {
+            URL.revokeObjectURL(url);
+            reject(new Error('Gagal memuat gambar'));
+        };
+        
+        img.src = url;
+    });
 }

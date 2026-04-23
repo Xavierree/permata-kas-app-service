@@ -36,6 +36,8 @@ const formatPhoneNumber = (phone) => {
     let formatted = phone.toString().replace(/\D/g, ''); // Remove non-digits
     if (formatted.startsWith('0')) {
         formatted = '62' + formatted.slice(1);
+    } else if (formatted.startsWith('8')) {
+        formatted = '62' + formatted;
     }
     return formatted;
 }

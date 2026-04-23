@@ -1,54 +1,43 @@
 const { formatRupiah } = require('./formatter');
 
 /**
- * Generates the chat template based on member data and arrears status.
+ * Generates the chat template WITHOUT introduction.
  * @param {object} member - The member data object.
- * @param {string} senderName - The name of the sender.
+ * @param {string} senderName - The name of the sender (kept for signature/context if needed).
  * @param {string} greeting - The greeting (e.g., "Kakak", "Abang").
  * @returns {string} - The generated message.
  */
 const generateTemplate = (member, senderName, greeting) => {
     // Check if TOTAL is "LUNAS" (case-insensitive) or 0
     if (String(member.total).toUpperCase().includes('LUNAS')) {
-        return null; // Should be handled by the caller to indicate paid status
+        return null;
     }
 
-    const arrears2024 = member.arrears2024 || 0;
-    const arrears2025 = member.arrears2025 || 0;
-    const totalDues2026 = member.totalDues2026 || 0; // Aggregated sum
-    const total = member.totalPayment; // numerical total
+    const totalDues2026 = member.totalDues2026 || 0;
+    const total = member.totalPayment;
 
     // Generate 2026 Label
     let label2026 = "2026";
     if (member.dues2026Detail && Object.keys(member.dues2026Detail).length > 0) {
         const months = Object.keys(member.dues2026Detail);
-        // Clean up "2026" from keys if present to just get months
         const cleanMonths = months.map(m => m.replace(' 2026', '').trim());
 
         if (cleanMonths.length > 1) {
-            // E.g. "Jan-Feb 2026"
             label2026 = `${cleanMonths[0]}-${cleanMonths[cleanMonths.length - 1]} 2026`;
         } else {
-            // E.g. "Jan 2026"
             label2026 = `${cleanMonths[0]} 2026`;
         }
     }
 
     // Greeting Logic
     let shortGreeting = greeting ? greeting.trim() : '';
-    let longGreeting = greeting ? greeting.trim() : '';
-
-    // Standard mappings for presets, otherwise use input as-is
     if (shortGreeting.toLowerCase() === 'kakak') shortGreeting = 'Kak';
     if (shortGreeting.toLowerCase() === 'abang') shortGreeting = 'Bang';
-    if (shortGreeting.toLowerCase() === 'none') {
-        shortGreeting = '';
-        longGreeting = '';
-    }
+    if (shortGreeting.toLowerCase() === 'none') shortGreeting = '';
 
     // Time-based Greeting Logic
     const hour = new Date().getHours();
-    let timeGreeting = 'pagi'; // Default
+    let timeGreeting = 'pagi';
 
     if (hour >= 5 && hour < 11) {
         timeGreeting = 'pagi';
@@ -57,25 +46,19 @@ const generateTemplate = (member, senderName, greeting) => {
     } else if (hour >= 15 && hour < 18) {
         timeGreeting = 'sore';
     } else {
-        timeGreeting = 'malam'; // 18:00 - 04:59
+        timeGreeting = 'malam';
     }
 
-    let msgGreeting = longGreeting ? ` ${longGreeting}` : '';
+    let msgGreeting = shortGreeting ? ` ${greeting !== 'none' ? greeting : ''}` : '';
     let msgShort = shortGreeting ? ` ${shortGreeting}` : '';
 
+    // Template 2: NO INTRODUCTION
     let message = `Shalom selamat ${timeGreeting}${msgGreeting}\n`;
-    message += `Aku ${senderName} dari Bidang Keuangan PERMATA, ingin mengingatkan untuk pembayaran iuran${msgShort}\n\n`;
+    message += `Ingin mengingatkan untuk pembayaran iuran${msgShort}\n\n`;
 
     message += `Untuk rincian iuranndu${msgShort}\n`;
 
-    // Only show years with arrears/dues > 0 to keep it "viable" and clean
-    // OR if the user strictly wants the list, we can show Rp 0. 
-    // Given "reminder", showing what is owed is standard. 
-    // However, the prompt implies a specific structure. 
-    // Let's safe-guard: if total is >0, show the breakdown.
-
     // Generate Arrears List from Map
-    // Sort keys to ensure chronological order (optional, but good)
     if (member.arrearsMap) {
         const sortedYears = Object.keys(member.arrearsMap).sort();
         sortedYears.forEach(year => {
@@ -86,8 +69,6 @@ const generateTemplate = (member, senderName, greeting) => {
         });
     }
 
-    // Always show 2026 if it's the current period, or only if > 0?
-    // User wrote "Jan-Feb 2026 : Rp...". Likely standard.
     if (totalDues2026 > 0) {
         message += `${label2026} : ${formatRupiah(totalDues2026)}\n`;
     }
